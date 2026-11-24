@@ -209,8 +209,8 @@ details summary{font-weight:800;cursor:pointer;min-height:32px}
     </div>
     <div class="card">
       <h3>내 이름</h3>
-      <p>통장 내역에서 보낸분·받는분이 내 이름인 거래(케이뱅크↔국민은행 이체 등)는 지출에서 빼요.</p>
-      <div class="tools"><input id="nameIn" autocomplete="off" placeholder="통장에 찍히는 이름"><button class="btn pri" id="nameSave">저장</button></div>
+      <p>보낸분·받는분이 내 이름인 거래(케이뱅크↔국민은행 이체 등)는 지출·수입에서 빼요. 은행마다 다르게 찍히면 쉼표로 여러 개 넣고, 가려진 글자는 <code>*</code>로 쓰세요(예: <code>전*래</code>). 저장하면 이미 들어온 거래에도 적용돼요.</p>
+      <div class="tools"><input id="nameIn" autocomplete="off" placeholder="통장에 찍히는 이름 (여러 개면 쉼표로)"><button class="btn pri" id="nameSave">저장</button></div>
     </div>
     <div class="card">
       <h3>월 예산</h3>
@@ -610,8 +610,7 @@ function drawPreview(){
 }
 function importParsed(list){
   const add=[];let skipped=0;
-  const me=(settings.myName||'').replace(/\s/g,'');
-  for(const p of list){if(me&&(p.m||'').replace(/\s/g,'').includes(me)){p.cat=p.dir==='in'?'내 계좌 입금':'내 계좌 이체';p.ex=true}if(existsHash(p.h)||add.some(a=>a.h===p.h)){skipped++;continue}const dup=nearDup(p)||add.find(o=>o.amt===p.amt&&o.dir===p.dir&&o.src!==p.src&&Math.abs(new Date(o.d)-new Date(p.d))<=180000);if(dup){skipped++;continue}add.push({id:uid(),...p})}
+  for(const p of list){if(isMine(p.m)){p.cat=p.dir==='in'?'내 계좌 입금':'내 계좌 이체';p.ex=true}if(existsHash(p.h)||add.some(a=>a.h===p.h)){skipped++;continue}const dup=nearDup(p)||add.find(o=>o.amt===p.amt&&o.dir===p.dir&&o.src!==p.src&&Math.abs(new Date(o.d)-new Date(p.d))<=180000);if(dup){skipped++;continue}add.push({id:uid(),...p})}
   if(add.length)addTxs(add);
   return {added:add.length,skipped,list:add};
 }
@@ -786,8 +785,7 @@ function reconcile(items,src){
     const h=fnv('bank|'+src+'|'+toLocalISO(it.d)+'|'+it.amt+'|'+it.dir+'|'+it.m);
     if(existsHash(h)){matched++;continue}
     let cat=guessCat(it.m,it.dir,it.m,settings.rules);
-    const me=(settings.myName||'').replace(/\s/g,'');
-    if(me&&it.m.replace(/\s/g,'').includes(me))cat=it.dir==='in'?'내 계좌 입금':'내 계좌 이체';
+    if(isMine(it.m))cat=it.dir==='in'?'내 계좌 입금':'내 계좌 이체';
     else if(it.dir==='out'&&/카카오페이|네이버페이|토스|페이코/.test(it.m)&&!settings.rules[it.m])cat='페이 충전';
     add.push({id:uid(),amt:it.amt,dir:it.dir,d:toLocalISO(it.d),m:it.m,cat,src,card:'',ex:!!catOf(cat).ex,memo:'통장 대사로 추가',h});
   }
@@ -831,12 +829,25 @@ document.addEventListener('click',e=>{
   if(dr){delete settings.rules[dr.dataset.delrule];persist();renderCatAdmin();toast('규칙을 지웠어요')}
 });
 $('#recatBtn').onclick=()=>{
-  let n=0;for(const t of allTx()){if(t.mc||/^(내 계좌|페이 충전)/.test(t.cat))continue;const c=guessCat(t.m,t.dir,t.raw||'',settings.rules);if(c!==t.cat){t.cat=c;t.ex=!!catOf(c).ex;n++}}
+  let n=applyMine();for(const t of allTx()){if(t.mc||/^(내 계좌|페이 충전)/.test(t.cat))continue;const c=guessCat(t.m,t.dir,t.raw||'',settings.rules);if(c!==t.cat){t.cat=c;t.ex=!!catOf(c).ex;n++}}
   if(n)persist();render();toast(n?`${n}건을 다시 분류했어요`:'바뀐 거래가 없어요');
 };
 
 /* ---------- 설정 ---------- */
-$('#nameSave').onclick=()=>{settings.myName=$('#nameIn').value.trim();persist();toast(settings.myName?'저장했어요':'지웠어요')};
+function isMine(m){
+  const s=String(m||'').replace(/\s/g,'');if(!s)return false;
+  return String(settings.myName||'').split(',').map(n=>n.replace(/\s/g,'')).filter(Boolean).some(n=>n.includes('*')?new RegExp(n.replace(/[.+?^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'.')).test(s):s.includes(n));
+}
+function applyMine(){
+  let n=0;
+  for(const t of allTx()){
+    const own=/^내 계좌/.test(t.cat);
+    if(isMine(t.m)){const c=t.dir==='in'?'내 계좌 입금':'내 계좌 이체';if(t.cat!==c||!t.ex){t.cat=c;t.ex=true;n++}}
+    else if(own&&!t.mc){const c=guessCat(t.m,t.dir,t.raw||'',settings.rules);t.cat=c;t.ex=!!catOf(c).ex;n++}
+  }
+  return n;
+}
+$('#nameSave').onclick=()=>{settings.myName=$('#nameIn').value.trim();const n=applyMine();persist();render();toast(settings.myName?(n?`저장 · 기존 거래 ${n}건을 내 계좌 이체로 바꿨어요`:'저장했어요'):'지웠어요')};
 $('#budgetSave').onclick=()=>{settings.budget=Math.max(0,+$('#budgetIn').value||0);persist('settings');render();toast(settings.budget?'예산을 저장했어요':'예산을 지웠어요')};
 function markBackup(){settings.lastBackup=new Date().toISOString();persist();notices()}
 $('#backupFile').onclick=async()=>{

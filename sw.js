@@ -1,5 +1,5 @@
 // 오프라인에서도 앱 화면이 열리도록 캐시합니다. 거래 데이터는 캐시가 아니라 기기 저장소에 있습니다.
-const CACHE = 'gagyebu-v5';
+const CACHE = 'gagyebu-v6';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-512.png'];
 // officecrypto.js는 처음 쓸 때 캐시됩니다.
 self.addEventListener('install', e => {
