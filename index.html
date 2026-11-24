@@ -130,6 +130,14 @@ details summary{font-weight:800;cursor:pointer;min-height:32px}
 .ocr .om,.ocr .oa{height:40px;border:1px solid var(--line);border-radius:10px;padding:0 8px;background:var(--bg);font-size:16px;width:100%}
 .ocr .oa{text-align:right;font-weight:700}
 .ocr.bad .oa{border-color:var(--acc);color:var(--acc2)}
+.crow{display:grid;grid-template-columns:38px minmax(0,1fr) 40px 40px 52px;gap:4px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)}
+.crow input[type=color]{width:34px;height:34px;border:0;padding:0;background:none;border-radius:50%;cursor:pointer}
+.crow input[type=color]::-webkit-color-swatch-wrapper{padding:0}.crow input[type=color]::-webkit-color-swatch{border:2px solid var(--line);border-radius:50%}
+.crow .cname{height:40px;border:1px solid transparent;border-radius:10px;padding:0 8px;background:transparent;font-size:16px;width:100%}
+.crow .cname:not([readonly]):focus,.crow .cname:not([readonly]):hover{border-color:var(--line);background:var(--bg)}
+.ib.sm{width:40px;height:40px;font-size:14px;color:var(--mute)}
+.ib.del{width:52px;color:var(--acc2);font-weight:700}
+.lock{font-size:12px;color:var(--mute);text-align:center}
 .rule{display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid var(--line);font-size:15px}
 .tools select{min-width:0}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
@@ -202,9 +210,9 @@ details summary{font-weight:800;cursor:pointer;min-height:32px}
     <h2>연동과 설정</h2>
     <div class="card">
       <h3>카테고리와 자동 분류</h3>
-      <p>거래는 가맹점 이름으로 자동 분류돼요. 거래를 눌러 카테고리를 바꾸면 같은 가맹점은 앞으로도 그렇게 분류됩니다.</p>
-      <div class="note" style="margin-bottom:4px">지출</div><div class="chips" id="catOut"></div>
-      <div class="note" style="margin:10px 0 4px">수입</div><div class="chips" id="catIn"></div>
+      <p>거래는 가맹점 이름으로 자동 분류돼요. 왼쪽 동그라미를 눌러 색을 바꾸고, 이름을 눌러 고치고, ▲▼로 순서를 바꿔요. '기본' 표시가 있는 카테고리는 계산에 쓰여서 지울 수 없어요.</p>
+      <div class="note" style="margin-bottom:4px">지출</div><div id="catOut"></div>
+      <div class="note" style="margin:14px 0 4px">수입</div><div id="catIn"></div>
       <form class="tools" id="catAdd" style="margin-top:12px"><input id="catName" placeholder="새 카테고리 이름 (예: 데이트)" autocomplete="off"><select id="catType" style="flex:0 0 96px"><option value="out">지출</option><option value="in">수입</option></select><button class="btn pri">추가</button></form>
       <h3 style="margin-top:18px">분류 규칙</h3>
       <p>가맹점 이름에 키워드가 들어 있으면 그 카테고리로 분류해요. 기존 거래에도 바로 적용됩니다.</p>
@@ -318,8 +326,8 @@ const CATS=[
  {k:'내 계좌 입금',c:'#e9ecef',d:'in',w:[],ex:true},
  {k:'기타수입',c:'#69db7c',d:'in',w:[]}
 ];
-let EXTRA=[];
-const allCats=()=>CATS.concat(EXTRA);
+let EXTRA=[],CATSOVR=null;
+const allCats=()=>CATSOVR||CATS.concat(EXTRA);
 const catOf=k=>allCats().find(c=>c.k===k)||CATS.find(c=>c.k==='기타');
 function guessCat(m,dir,raw,rules){
   const s=(m||'').trim();
@@ -328,7 +336,7 @@ function guessCat(m,dir,raw,rules){
   if(rules&&s){let best=null;for(const [kw,cat] of Object.entries(rules)){if(kw&&s.toUpperCase().includes(kw.toUpperCase())&&catOf(cat).k===cat&&(catOf(cat).d===dir||dir==='in')&&(!best||kw.length>best[0].length))best=[kw,cat]}if(best)return best[1]}
   // 2) 기본 키워드 (가장 길게 맞는 키워드의 카테고리)
   let bk='',bc=null;
-  for(const c of CATS){if(c.d!==dir)continue;if(c.k==='카드대금'&&/승인|누적/.test(hay))continue;for(const w of c.w){if(w&&w.length>bk.length&&hay.includes(w.toUpperCase())){bk=w;bc=c.k}}}
+  for(const c of allCats()){if(c.d!==dir||!c.w)continue;if(c.k==='카드대금'&&/승인|누적/.test(hay))continue;for(const w of c.w){if(w&&w.length>bk.length&&hay.includes(w.toUpperCase())){bk=w;bc=c.k}}}
   return bc||(dir==='in'?'기타수입':'기타');
 }
 function fnv(str){let h=0x811c9dc5;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0}return h.toString(16)}
@@ -445,7 +453,7 @@ function persist(){
 }
 function initStore(){
   try{const raw=localStorage.getItem(LS);const s=raw?JSON.parse(raw):null;if(s){months=s.months||{};settings=Object.assign({rules:{},budget:0,lastBackup:'',customCats:[]},s.settings)}}catch(e){setStatus('저장소를 열 수 없어요')}
-  EXTRA=settings.customCats||[];refreshCatOptions();
+  syncCats();refreshCatOptions();
   setStatus('이 아이폰에 저장됨');
   if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
   render();
@@ -872,7 +880,7 @@ function reconcile(items,src){
     if(existsHash(h)){matched++;continue}
     let cat=guessCat(it.m,it.dir,it.m,settings.rules);
     if(isMine(it.m))cat=it.dir==='in'?'내 계좌 입금':'내 계좌 이체';
-    else if(src!=='카카오페이'&&it.dir==='out'&&/카카오페이|네이버페이|토스|페이코/.test(it.m)&&!settings.rules[it.m])cat='페이 충전';
+    else if(allCats().some(c=>c.k==='페이 충전')&&src!=='카카오페이'&&it.dir==='out'&&/카카오페이|네이버페이|토스|페이코/.test(it.m)&&!settings.rules[it.m])cat='페이 충전';
     add.push({id:uid(),amt:it.amt,dir:it.dir,d:toLocalISO(it.d),m:it.m,cat,src,card:'',pay:it.pay||'debit',ex:!!catOf(cat).ex,memo:it.pay==='credit'?'카드 내역으로 추가':'통장 대사로 추가',h});
   }
   if(add.length)addTxs(add);else if(filled||payFixed)persist();
@@ -884,10 +892,19 @@ function reconcile(items,src){
 function applyCat(pred,cat){let n=0;const ex=!!catOf(cat).ex;for(const t of allTx()){if(pred(t)&&t.cat!==cat){t.cat=cat;t.ex=ex;n++}}if(n)persist();return n}
 const PALETTE=['#f76707','#1098ad','#ae3ec9','#74b816','#f59f00','#4263eb','#e64980','#0ca678','#7950f2','#fd7e14'];
 let catDelArmed=null;
+const LOCKED=['기타','기타수입','내 계좌 이체','내 계좌 입금'];
+function syncCats(){
+  if(Array.isArray(settings.cats)&&settings.cats.length){
+    for(const k of LOCKED)if(!settings.cats.some(c=>c.k===k)){const b=CATS.find(c=>c.k===k);settings.cats.push({k,c:b.c,d:b.d,ex:!!b.ex})}
+    CATSOVR=settings.cats.map(c=>({...(CATS.find(b=>b.k===c.k)||{w:[]}),...c}));
+  }else{CATSOVR=null;EXTRA=settings.customCats||[]}
+}
+function ensureCats(){if(!Array.isArray(settings.cats)||!settings.cats.length){settings.cats=allCats().map(c=>({k:c.k,c:c.c,d:c.d,ex:!!c.ex,custom:!!c.custom}));settings.customCats=[]}}
+function catsChanged(){syncCats();persist();refreshCatOptions();renderCatAdmin();render()}
 function renderCatAdmin(){
-  const chip=c=>`<span class="chip"><i style="background:${c.c}"></i>${esc(c.k)}${c.custom?`<button type="button" data-delcat="${esc(c.k)}" aria-label="${esc(c.k)} 삭제">${catDelArmed===c.k?'삭제?':'✕'}</button>`:''}</span>`;
-  $('#catOut').innerHTML=allCats().filter(c=>c.d==='out').map(chip).join('');
-  $('#catIn').innerHTML=allCats().filter(c=>c.d==='in').map(chip).join('');
+  const row=c=>{const lock=LOCKED.includes(c.k);const k=esc(c.k);return `<div class="crow"><input type="color" value="${c.c}" data-ccolor="${k}" aria-label="${k} 색상"><input class="cname" value="${k}" data-cname="${k}" aria-label="카테고리 이름"${lock?' readonly':''}><button type="button" class="ib sm" data-cmove="${k}" data-step="-1" aria-label="위로">▲</button><button type="button" class="ib sm" data-cmove="${k}" data-step="1" aria-label="아래로">▼</button>${lock?'<span class="lock">기본</span>':`<button type="button" class="ib sm del" data-delcat="${k}" aria-label="${k} 삭제">${catDelArmed===c.k?'삭제?':'✕'}</button>`}</div>`};
+  $('#catOut').innerHTML=allCats().filter(c=>c.d==='out').map(row).join('');
+  $('#catIn').innerHTML=allCats().filter(c=>c.d==='in').map(row).join('');
   const rs=Object.entries(settings.rules||{}).sort((a,b)=>a[0].localeCompare(b[0],'ko'));
   $('#ruleList').innerHTML=rs.length?rs.map(([k,v])=>`<div class="rule"><span><b>${esc(k)}</b> → ${esc(v)}</span><button type="button" class="ib" data-delrule="${esc(k)}" aria-label="규칙 삭제">✕</button></div>`).join(''):'<p class="note">아직 직접 정한 규칙이 없어요. 거래를 눌러 카테고리를 바꾸면 여기에 쌓여요.</p>';
   const rv=$('#ruleCat').value;$('#ruleCat').innerHTML=`<optgroup label="지출">${catOptions('out',rv)}</optgroup><optgroup label="수입">${allCats().filter(c=>c.d==='in').map(c=>`<option${c.k===rv?' selected':''}>${esc(c.k)}</option>`).join('')}</optgroup>`;
@@ -895,9 +912,30 @@ function renderCatAdmin(){
 $('#catAdd').onsubmit=e=>{
   e.preventDefault();const k=$('#catName').value.trim(),d=$('#catType').value;
   if(!k)return;if(allCats().some(c=>c.k===k)){toast('이미 있는 카테고리예요');return}
-  settings.customCats=(settings.customCats||[]).concat({k,d,c:PALETTE[(settings.customCats||[]).length%PALETTE.length],w:[],custom:true});
-  EXTRA=settings.customCats;persist();$('#catName').value='';refreshCatOptions();renderCatAdmin();toast(`'${k}' 카테고리를 만들었어요`);
+  ensureCats();settings.cats.push({k,d,c:PALETTE[settings.cats.filter(c=>c.custom).length%PALETTE.length],custom:true});
+  $('#catName').value='';catsChanged();toast(`'${k}' 카테고리를 만들었어요`);
 };
+// 색상: 고르는 동안 바로 보이고, 다 고르면 저장
+document.addEventListener('input',e=>{const el=e.target.closest('[data-ccolor]');if(!el)return;ensureCats();const c=settings.cats.find(x=>x.k===el.dataset.ccolor);if(c){c.c=el.value;syncCats();render()}});
+document.addEventListener('change',e=>{
+  if(e.target.closest('[data-ccolor]')){persist();return}
+  const el=e.target.closest('[data-cname]');if(!el||el.readOnly)return;
+  const old=el.dataset.cname,nk=el.value.trim();
+  if(!nk||nk===old){el.value=old;return}
+  if(allCats().some(c=>c.k===nk)){toast('이미 있는 이름이에요');el.value=old;return}
+  ensureCats();const c=settings.cats.find(x=>x.k===old);if(!c)return;c.k=nk;
+  for(const t of allTx())if(t.cat===old)t.cat=nk;
+  for(const [kw,v] of Object.entries(settings.rules))if(v===old)settings.rules[kw]=nk;
+  if($('#fCat').value===old)$('#fCat').value='';
+  catsChanged();toast(`'${old}' → '${nk}'(으)로 바꿨어요`);
+});
+document.addEventListener('click',e=>{
+  const mv=e.target.closest('[data-cmove]');
+  if(mv){ensureCats();const arr=settings.cats;const i=arr.findIndex(x=>x.k===mv.dataset.cmove);if(i<0)return;const d=arr[i].d,step=+mv.dataset.step;
+    let j=i+step;while(j>=0&&j<arr.length&&arr[j].d!==d)j+=step;
+    if(j<0||j>=arr.length)return;[arr[i],arr[j]]=[arr[j],arr[i]];catsChanged();
+    const b=document.querySelector(`[data-cmove="${CSS.escape(mv.dataset.cmove)}"][data-step="${step}"]`);if(b)b.focus();return}
+});
 $('#ruleAdd').onsubmit=e=>{
   e.preventDefault();const k=$('#ruleKw').value.trim(),cat=$('#ruleCat').value;if(!k||!cat)return;
   settings.rules[k]=cat;const d=catOf(cat).d;
@@ -907,10 +945,11 @@ $('#ruleAdd').onsubmit=e=>{
 document.addEventListener('click',e=>{
   const dc=e.target.closest('[data-delcat]');
   if(dc){const k=dc.dataset.delcat;if(catDelArmed!==k){catDelArmed=k;renderCatAdmin();return}
-    catDelArmed=null;const c=catOf(k);const fb=c.d==='in'?'기타수입':'기타';
-    settings.customCats=(settings.customCats||[]).filter(x=>x.k!==k);EXTRA=settings.customCats;
+    catDelArmed=null;if(LOCKED.includes(k))return;const c=catOf(k);const fb=c.d==='in'?'기타수입':'기타';
+    ensureCats();settings.cats=settings.cats.filter(x=>x.k!==k);
     for(const [kw,v] of Object.entries(settings.rules))if(v===k)delete settings.rules[kw];
-    applyCat(t=>t.cat===k,fb);persist();refreshCatOptions();renderCatAdmin();render();toast(`'${k}'을(를) 지우고 거래는 ${fb}(으)로 옮겼어요`);return}
+    if($('#fCat').value===k)$('#fCat').value='';
+    syncCats();applyCat(t=>t.cat===k,fb);catsChanged();toast(`'${k}'을(를) 지우고 거래는 ${fb}(으)로 옮겼어요`);return}
   const dr=e.target.closest('[data-delrule]');
   if(dr){delete settings.rules[dr.dataset.delrule];persist();renderCatAdmin();toast('규칙을 지웠어요')}
 });
@@ -955,6 +994,7 @@ $('#restoreBtn').onclick=()=>{
   for(const ts of Object.values(d.months))for(const t of ts||[]){if(t&&t.id&&!have.has(t.id)&&t.d&&t.amt){add.push(t);n++}}
   if(add.length)addTxs(add);
   if(d.settings&&d.settings.rules){settings.rules={...d.settings.rules,...settings.rules}}
+  if(d.settings&&Array.isArray(d.settings.cats)&&d.settings.cats.length&&!(settings.cats&&settings.cats.length)){settings.cats=d.settings.cats;syncCats();refreshCatOptions()}
   if(d.settings&&Array.isArray(d.settings.customCats)){for(const c of d.settings.customCats)if(c&&c.k&&!allCats().some(x=>x.k===c.k))settings.customCats=(settings.customCats||[]).concat(c);EXTRA=settings.customCats;refreshCatOptions()}
   persist();
   $('#backupRes').textContent=`${n}건을 복원했어요. 이미 있던 거래는 그대로 두었습니다.`;render();
