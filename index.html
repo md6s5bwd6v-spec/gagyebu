@@ -119,6 +119,12 @@ pre.code{display:block;padding:10px 12px;white-space:pre-wrap;margin:6px 0}
 details{border-top:1px solid var(--line);padding:12px 0}
 details summary{font-weight:800;cursor:pointer;min-height:32px}
 .note{font-size:13px;color:var(--mute)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 10px;font-size:14px;min-height:34px}
+.chip i{width:10px;height:10px;border-radius:50%;flex:none}
+.chip button{border:0;background:none;color:var(--mute);min-width:30px;min-height:30px;font-size:13px;font-weight:700}
+.rule{display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid var(--line);font-size:15px}
+.tools select{min-width:0}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
 </style>
 </head>
@@ -187,6 +193,19 @@ details summary{font-weight:800;cursor:pointer;min-height:32px}
   <section class="view" id="v-set">
     <h2>연동과 설정</h2>
     <div class="card">
+      <h3>카테고리와 자동 분류</h3>
+      <p>거래는 가맹점 이름으로 자동 분류돼요. 거래를 눌러 카테고리를 바꾸면 같은 가맹점은 앞으로도 그렇게 분류됩니다.</p>
+      <div class="note" style="margin-bottom:4px">지출</div><div class="chips" id="catOut"></div>
+      <div class="note" style="margin:10px 0 4px">수입</div><div class="chips" id="catIn"></div>
+      <form class="tools" id="catAdd" style="margin-top:12px"><input id="catName" placeholder="새 카테고리 이름 (예: 데이트)" autocomplete="off"><select id="catType" style="flex:0 0 96px"><option value="out">지출</option><option value="in">수입</option></select><button class="btn pri">추가</button></form>
+      <h3 style="margin-top:18px">분류 규칙</h3>
+      <p>가맹점 이름에 키워드가 들어 있으면 그 카테고리로 분류해요. 기존 거래에도 바로 적용됩니다.</p>
+      <form class="tools" id="ruleAdd"><input id="ruleKw" placeholder="키워드 (예: 쿠팡)" autocomplete="off"><select id="ruleCat"></select><button class="btn pri">추가</button></form>
+      <div id="ruleList"></div>
+      <div class="btns"><button class="btn" id="recatBtn" type="button">전체 다시 분류</button></div>
+      <p class="note">직접 하나씩 바꾼 거래는 다시 분류할 때 건드리지 않아요.</p>
+    </div>
+    <div class="card">
       <h3>내 이름</h3>
       <p>통장 내역에서 보낸분·받는분이 내 이름인 거래(케이뱅크↔국민은행 이체 등)는 지출에서 빼요.</p>
       <div class="tools"><input id="nameIn" autocomplete="off" placeholder="통장에 찍히는 이름"><button class="btn pri" id="nameSave">저장</button></div>
@@ -202,7 +221,7 @@ details summary{font-weight:800;cursor:pointer;min-height:32px}
       <details open>
         <summary>① 케이뱅크·KB스타뱅킹 알림</summary>
         <ol class="steps">
-          <li>단축어 앱 › <b>자동화</b> › <b>+</b> › <b>알림</b>을 고릅니다.</li>
+          <li>단축어 앱에서 <b>+</b>로 새 단축어를 만들고, 동작 목록의 <b>자동화</b> 카테고리에서 <b>알림</b> 트리거를 넣습니다.</li>
           <li>앱에서 <b>케이뱅크</b>를 고르고, 메시지 필터에 <code>원</code>을 포함하도록 둡니다. <b>즉시 실행</b>을 켭니다.</li>
           <li>새 단축어에 <b>텍스트</b> 동작을 넣고 아래처럼 씁니다. 대괄호 부분은 변수로 넣으세요.
             <pre class="code">=== [현재 날짜] | 케이뱅크
@@ -215,7 +234,7 @@ details summary{font-weight:800;cursor:pointer;min-height:32px}
       <details>
         <summary>② 신한카드 결제 문자</summary>
         <ol class="steps">
-          <li>자동화 › <b>+</b> › <b>메시지</b>를 고르고, 메시지 내용에 <code>신한카드</code>가 포함될 때로 둡니다. <b>즉시 실행</b>을 켭니다.</li>
+          <li>새 단축어 › 동작 목록 › <b>자동화</b> › <b>메시지</b> 트리거를 넣고, 메시지 내용에 <code>신한카드</code>가 포함될 때로 둡니다. <b>즉시 실행</b>을 켭니다.</li>
           <li>텍스트 동작: <pre class="code">=== [현재 날짜] | 신한카드
 [단축어 입력]</pre></li>
           <li>①과 같은 <code>가계부/수신.txt</code>에 추가합니다.</li>
@@ -224,7 +243,7 @@ details summary{font-weight:800;cursor:pointer;min-height:32px}
       <details>
         <summary>③ 카카오페이 송금·입금</summary>
         <ol class="steps">
-          <li>자동화 › <b>알림</b> › 앱 <b>카카오톡</b>(또는 카카오페이 앱).</li>
+          <li>새 단축어 › 동작 목록 › <b>자동화</b> › <b>알림</b> 트리거, 앱 <b>카카오톡</b>(또는 카카오페이 앱).</li>
           <li><b>제목에 <code>카카오페이</code> 포함</b> 필터를 꼭 거세요. 이 필터가 없으면 일반 대화도 전부 기록됩니다.</li>
           <li>텍스트 동작 첫 줄을 <code>=== [현재 날짜] | 카카오페이</code>로 하고, 같은 파일에 추가합니다.</li>
         </ol>
@@ -256,6 +275,7 @@ details summary{font-weight:800;cursor:pointer;min-height:32px}
     <label class="f amt"><span>금액</span><input id="fAmt" inputmode="numeric" autocomplete="off" required></label>
     <label class="f"><span>가맹점·내용</span><input id="fM" autocomplete="off"></label>
     <label class="f"><span>카테고리</span><select id="fCatSel"></select></label>
+    <label class="chk" id="fAllWrap"><input type="checkbox" id="fAll" checked> <span id="fAllTxt">같은 가맹점 거래도 모두 바꾸고, 앞으로도 이렇게 분류</span></label>
     <label class="f"><span>날짜와 시간</span><input id="fD" type="datetime-local" required></label>
     <label class="f"><span>메모</span><input id="fMemo" autocomplete="off"></label>
     <label class="chk"><input type="checkbox" id="fEx"> 통계에서 제외 (카드대금, 내 계좌 간 이체 등)</label>
@@ -269,14 +289,14 @@ details summary{font-weight:800;cursor:pointer;min-height:32px}
 {
 /*PARSER-START*/
 const CATS=[
- {k:'식비',c:'#ff4a1c',d:'out',w:['배달의민족','배민','요기요','쿠팡이츠','식당','김밥','분식','치킨','피자','버거','맥도날드','롯데리아','버거킹','맘스터치','서브웨이','국밥','한식','중식','일식','초밥','고기','식육','푸드','반점','곱창','라멘','도시락']},
+ {k:'식비',c:'#ff4a1c',d:'out',w:['배달의민족','배민','요기요','쿠팡이츠','식당','김밥','분식','치킨','피자','버거','맥도날드','롯데리아','버거킹','맘스터치','서브웨이','국밥','한식','중식','일식','초밥','고기','식육','푸드','반점','곱창','라멘','도시락','우아한형제','배민클럽','떡볶이','샐러드','돈까스','칼국수']},
  {k:'카페·간식',c:'#b5651d',d:'out',w:['스타벅스','커피','카페','메가MGC','메가커피','컴포즈','투썸','이디야','빽다방','폴바셋','할리스','파스쿠찌','베이커리','파리바게뜨','뚜레쥬르','배스킨','설빙','디저트','공차']},
  {k:'편의점·마트',c:'#e0a100',d:'out',w:['GS25','지에스25','CU','씨유','세븐일레븐','이마트24','미니스톱','이마트','홈플러스','롯데마트','코스트코','노브랜드','마트','슈퍼','컬리']},
- {k:'교통',c:'#2a6fdb',d:'out',w:['택시','카카오T','카카오모빌리티','티머니','코레일','KTX','지하철','버스','교통','SRT','주유','오일','에너지','하이패스','주차','쏘카','타다','항공']},
+ {k:'교통',c:'#2a6fdb',d:'out',w:['택시','카카오T','카카오모빌리티','티머니','코레일','KTX','지하철','버스','교통','SRT','주유','오일','에너지','하이패스','주차','쏘카','타다','항공','후불교통','교통대금','이동의즐거움','카카오택시','우티','UT']},
  {k:'쇼핑',c:'#8a3ffc',d:'out',w:['쿠팡','네이버페이','무신사','올리브영','지그재그','에이블리','29CM','11번가','G마켓','옥션','SSG','신세계','롯데백화점','현대백화점','다이소','아트박스','유니클로','자라','H&M','알리','테무']},
  {k:'주거·통신',c:'#0d7680',d:'out',w:['SKT','에스케이텔레콤','KT','LG유플러스','LGU+','관리비','월세','전기','가스','수도','인터넷','넷플릭스','유튜브','디즈니','왓챠','티빙','쿠팡플레이','애플','APPLE','구글','멜론','스포티파이','Spotify','SPOTIFY']},
  {k:'의료·건강',c:'#d6336c',d:'out',w:['병원','의원','약국','치과','한의원','안과','피부과','정형외과','헬스','필라테스','요가']},
- {k:'문화·여가',c:'#5c940d',d:'out',w:['CGV','롯데시네마','메가박스','영화','서점','교보','yes24','예스24','알라딘','노래','PC방','볼링','전시','티켓','인터파크','여행','호텔','숙박','야놀자','여기어때']},
+ {k:'문화·여가',c:'#5c940d',d:'out',w:['CGV','롯데시네마','메가박스','영화','서점','교보','yes24','예스24','알라딘','노래','PC방','볼링','전시','티켓','인터파크','여행','호텔','숙박','야놀자','여기어때','오락실','보드게임','웹툰','네이버웹툰','게임','방탈출','코인노래']},
  {k:'송금',c:'#495057',d:'out',w:['송금','이체','보냈']},
  {k:'카드대금',c:'#868e96',d:'out',w:['카드대금','신한카드','결제대금'],ex:true},
  {k:'페이 충전',c:'#ced4da',d:'out',w:[],ex:true},
@@ -289,13 +309,18 @@ const CATS=[
  {k:'내 계좌 입금',c:'#e9ecef',d:'in',w:[],ex:true},
  {k:'기타수입',c:'#69db7c',d:'in',w:[]}
 ];
-const catOf=k=>CATS.find(c=>c.k===k)||CATS.find(c=>c.k==='기타');
+let EXTRA=[];
+const allCats=()=>CATS.concat(EXTRA);
+const catOf=k=>allCats().find(c=>c.k===k)||CATS.find(c=>c.k==='기타');
 function guessCat(m,dir,raw,rules){
   const s=(m||'').trim();
-  if(rules&&s&&rules[s])return rules[s];
   const hay=(s+' '+(raw||'')).toUpperCase();
-  for(const c of CATS){if(c.d!==dir)continue;for(const w of c.w){if(w&&hay.includes(w.toUpperCase())&&!(c.k==='카드대금'&&/승인|누적/.test(hay)))return c.k}}
-  return dir==='in'?'기타수입':'기타';
+  // 1) 직접 정한 규칙: 가맹점 이름에 키워드가 들어 있으면 (긴 키워드 우선)
+  if(rules&&s){let best=null;for(const [kw,cat] of Object.entries(rules)){if(kw&&s.toUpperCase().includes(kw.toUpperCase())&&catOf(cat).d===dir&&catOf(cat).k===cat&&(!best||kw.length>best[0].length))best=[kw,cat]}if(best)return best[1]}
+  // 2) 기본 키워드 (가장 길게 맞는 키워드의 카테고리)
+  let bk='',bc=null;
+  for(const c of CATS){if(c.d!==dir)continue;if(c.k==='카드대금'&&/승인|누적/.test(hay))continue;for(const w of c.w){if(w&&w.length>bk.length&&hay.includes(w.toUpperCase())){bk=w;bc=c.k}}}
+  return bc||(dir==='in'?'기타수입':'기타');
 }
 function fnv(str){let h=0x811c9dc5;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0}return h.toString(16)}
 const pad=n=>String(n).padStart(2,'0');
@@ -409,7 +434,8 @@ function persist(){
   catch(e){toast('저장하지 못했어요. 저장 공간을 확인하고 백업해 주세요.');return Promise.resolve()}
 }
 function initStore(){
-  try{const raw=localStorage.getItem(LS);const s=raw?JSON.parse(raw):null;if(s){months=s.months||{};settings=Object.assign({rules:{},budget:0,lastBackup:''},s.settings)}}catch(e){setStatus('저장소를 열 수 없어요')}
+  try{const raw=localStorage.getItem(LS);const s=raw?JSON.parse(raw):null;if(s){months=s.months||{};settings=Object.assign({rules:{},budget:0,lastBackup:'',customCats:[]},s.settings)}}catch(e){setStatus('저장소를 열 수 없어요')}
+  EXTRA=settings.customCats||[];refreshCatOptions();
   setStatus('이 아이폰에 저장됨');
   if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
   render();
@@ -471,6 +497,7 @@ function render(){
   renderList();notices();
   if(document.activeElement!==$('#budgetIn'))$('#budgetIn').value=settings.budget||'';
   if(document.activeElement!==$('#nameIn'))$('#nameIn').value=settings.myName||'';
+  renderCatAdmin();
 }
 function renderList(){
   const q=$('#q').value.trim().toLowerCase(),fc=$('#fCat').value;
@@ -498,15 +525,18 @@ document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('clic
 }));
 function shiftMonth(d){let [y,m]=cur.split('-').map(Number);m+=d;if(m<1){m=12;y--}if(m>12){m=1;y++}cur=y+'-'+pad(m);render()}
 $('#prevM').onclick=()=>shiftMonth(-1);$('#nextM').onclick=()=>shiftMonth(1);
-$('#fCat').innerHTML+=CATS.map(c=>`<option>${c.k}</option>`).join('');
+function refreshCatOptions(){const v=$('#fCat').value;$('#fCat').innerHTML='<option value="">전체 카테고리</option>'+allCats().map(c=>`<option>${esc(c.k)}</option>`).join('');$('#fCat').value=v}
+refreshCatOptions();
 $('#q').addEventListener('input',renderList);$('#fCat').addEventListener('change',renderList);
 $('#cats').addEventListener('click',e=>{const r=e.target.closest('.row');if(!r)return;$('#fCat').value=r.dataset.cat;document.querySelector('nav.tabs button[data-v=list]').click();renderList()});
 
 /* ---------- 편집 시트 ---------- */
 let editing=null,sheetDir='out',delArmed=false;
-function fillCatSel(dir,val){$('#fCatSel').innerHTML=CATS.filter(c=>c.d===dir).map(c=>`<option${c.k===val?' selected':''}>${c.k}</option>`).join('')}
+function catOptions(dir,val){return allCats().filter(c=>c.d===dir).map(c=>`<option${c.k===val?' selected':''}>${esc(c.k)}</option>`).join('')}
+function fillCatSel(dir,val){$('#fCatSel').innerHTML=catOptions(dir,val)}
 function setDir(d){sheetDir=d;document.querySelectorAll('.seg button').forEach(b=>b.classList.toggle('on',b.dataset.dir===d));const v=$('#fCatSel').value;fillCatSel(d,catOf(v).d===d?v:(d==='in'?'기타수입':'기타'))}
 document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>setDir(b.dataset.dir));
+$('#fCatSel').addEventListener('change',()=>{$('#fEx').checked=!!catOf($('#fCatSel').value).ex});
 function openSheet(t){
   editing=t||null;delArmed=false;$('#delBtn').textContent='삭제';
   const x=t||{amt:'',dir:'out',m:'',cat:'기타',d:toLocalISO(new Date()),memo:'',ex:false};
@@ -514,6 +544,7 @@ function openSheet(t){
   $('#fAmt').value=x.amt?Number(x.amt).toLocaleString('ko-KR'):'';$('#fM').value=x.m||'';$('#fD').value=x.d;$('#fMemo').value=x.memo||'';$('#fEx').checked=!!x.ex;
   fillCatSel(x.dir,x.cat);setDir(x.dir);$('#fCatSel').value=x.cat;
   $('#fRaw').hidden=!x.raw;$('#fRaw').textContent=x.raw?'원문 · '+x.src+'\n'+x.raw:'';
+  $('#fAllWrap').hidden=!t||!x.m;$('#fAll').checked=true;
   $('#delBtn').hidden=!t;$('#sheet').classList.add('on');setTimeout(()=>$('#fAmt').focus(),50);
 }
 function closeSheet(){$('#sheet').classList.remove('on');editing=null}
@@ -529,7 +560,10 @@ $('#txForm').addEventListener('submit',e=>{
     const ok=keyOf(editing.d),nk=keyOf(t.d);
     months[ok]=(months[ok]||[]).filter(x=>x.id!==editing.id);
     (months[nk]=months[nk]||[]).push(t);persist(ok);if(nk!==ok)persist(nk);
-    if(t.m&&t.cat!==editing.cat){settings.rules[t.m]=t.cat;persist('settings')}
+    if(t.cat!==editing.cat){
+      if(t.m&&$('#fAll').checked){settings.rules[t.m]=t.cat;const n=applyCat(x=>x.m===t.m&&x.dir===t.dir&&x.id!==t.id,t.cat);persist();if(n)setTimeout(()=>toast(`같은 가맹점 ${n}건도 ${t.cat}(으)로 바꿨어요`),2300)}
+      else t.mc=true;
+    }
   }else addTxs([t]);
   closeSheet();render();toast(editing?'수정했어요':'추가했어요');
 });
@@ -557,7 +591,7 @@ $('#parseBtn').onclick=()=>{
   drawPreview();
 };
 function drawPreview(){
-  $('#preview').innerHTML=pending.map((p,i)=>p.err?`<div class="pv"><div class="warn">${p.err}. 직접 입력으로 추가해 주세요.</div><div class="note">${esc(p.raw.slice(0,80))}</div></div>`:`<div class="pv"><div class="top"><span>${esc(p.m||'(가맹점 없음)')}</span><span class="num" style="color:${p.dir==='in'?'var(--in)':'inherit'}">${p.dir==='in'?'+':'−'}${won(p.amt)}</span></div><div class="note">${p.d.replace('T',' ')} · ${esc(p.src)}${p.card?' '+p.card:''}</div><select data-i="${i}" aria-label="카테고리">${CATS.filter(c=>c.d===p.dir).map(c=>`<option${c.k===p.cat?' selected':''}>${c.k}</option>`).join('')}</select>${existsHash(p.h)?'<div class="warn">이미 기록된 알림이에요. 저장 시 건너뜁니다.</div>':nearDup(p)?'<div class="warn">비슷한 거래가 다른 경로로 이미 있어요. 저장 시 건너뜁니다.</div>':''}</div>`).join('')+(pending.some(p=>!p.err)?'<div class="btns"><button class="btn acc" id="savePending">저장</button></div>':'');
+  $('#preview').innerHTML=pending.map((p,i)=>p.err?`<div class="pv"><div class="warn">${p.err}. 직접 입력으로 추가해 주세요.</div><div class="note">${esc(p.raw.slice(0,80))}</div></div>`:`<div class="pv"><div class="top"><span>${esc(p.m||'(가맹점 없음)')}</span><span class="num" style="color:${p.dir==='in'?'var(--in)':'inherit'}">${p.dir==='in'?'+':'−'}${won(p.amt)}</span></div><div class="note">${p.d.replace('T',' ')} · ${esc(p.src)}${p.card?' '+p.card:''}</div><select data-i="${i}" aria-label="카테고리">${catOptions(p.dir,p.cat)}</select>${existsHash(p.h)?'<div class="warn">이미 기록된 알림이에요. 저장 시 건너뜁니다.</div>':nearDup(p)?'<div class="warn">비슷한 거래가 다른 경로로 이미 있어요. 저장 시 건너뜁니다.</div>':''}</div>`).join('')+(pending.some(p=>!p.err)?'<div class="btns"><button class="btn acc" id="savePending">저장</button></div>':'');
   $('#preview').querySelectorAll('select').forEach(s=>s.onchange=()=>{const p=pending[+s.dataset.i];p.cat=s.value;p.ex=!!catOf(s.value).ex});
   const sb=$('#savePending');if(sb)sb.onclick=()=>{const r=importParsed(pending.filter(p=>!p.err));$('#paste').value='';$('#preview').innerHTML=`<div class="result">${r.added}건 저장${r.skipped?`, ${r.skipped}건은 중복이라 건너뜀`:''}.</div>`;if(r.added){const last=r.list[r.list.length-1];cur=keyOf(last.d);render()}};
 }
@@ -597,7 +631,7 @@ function bankRows(rows,XL){
   for(let i=0;i<Math.min(rows.length,40);i++){
     const r=rows[i].map(c=>String(c??'').replace(/\s/g,''));
     const di=r.findIndex(c=>/거래일|일시|일자|날짜/.test(c)),oi=r.findIndex(c=>/출금|찾으신|지급/.test(c)&&!/가능/.test(c));
-    if(di>=0&&oi>=0){hi=i;col={d:di,o:oi,i:r.findIndex(c=>/입금|맡기신/.test(c)),m:[r.findIndex(c=>/기재내용|적요|내용|거래처|받는분|보낸분|상대|메모|거래점/.test(c)),r.findIndex(c=>/상대|받는분|보낸분|기재내용/.test(c)),r.findIndex(c=>/메모|비고/.test(c))].filter((x,j,a)=>x>=0&&a.indexOf(x)===j),t:r.findIndex((c,j)=>j!==di&&/^(거래)?시간$|거래시각/.test(c))};break}
+    if(di>=0&&oi>=0){hi=i;col={d:di,o:oi,i:r.findIndex(c=>/입금|맡기신/.test(c)),m:r.map((c,j)=>({j,p:/은행|계좌|거래점|구분|잔액|금액/.test(c)?-1:/가맹점|적요내용|기재내용|거래내용|^내용$|사용처/.test(c)?0:/상대예금주|예금주|받는분|보낸분|거래처|상대방|상대/.test(c)?1:/^적요$/.test(c)?2:/메모|비고/.test(c)?3:-1})).filter(o=>o.p>=0).sort((a,b)=>a.p-b.p).map(o=>o.j),t:r.findIndex((c,j)=>j!==di&&/^(거래)?시간$|거래시각/.test(c))};break}
   }
   if(hi<0)return null;
   const out=[];
@@ -749,6 +783,45 @@ function reconcile(items,src){
   render();
 }
 
+/* ---------- 카테고리 관리 ---------- */
+function applyCat(pred,cat){let n=0;const ex=!!catOf(cat).ex;for(const t of allTx()){if(pred(t)&&t.cat!==cat){t.cat=cat;t.ex=ex;n++}}if(n)persist();return n}
+const PALETTE=['#f76707','#1098ad','#ae3ec9','#74b816','#f59f00','#4263eb','#e64980','#0ca678','#7950f2','#fd7e14'];
+let catDelArmed=null;
+function renderCatAdmin(){
+  const chip=c=>`<span class="chip"><i style="background:${c.c}"></i>${esc(c.k)}${c.custom?`<button type="button" data-delcat="${esc(c.k)}" aria-label="${esc(c.k)} 삭제">${catDelArmed===c.k?'삭제?':'✕'}</button>`:''}</span>`;
+  $('#catOut').innerHTML=allCats().filter(c=>c.d==='out').map(chip).join('');
+  $('#catIn').innerHTML=allCats().filter(c=>c.d==='in').map(chip).join('');
+  const rs=Object.entries(settings.rules||{}).sort((a,b)=>a[0].localeCompare(b[0],'ko'));
+  $('#ruleList').innerHTML=rs.length?rs.map(([k,v])=>`<div class="rule"><span><b>${esc(k)}</b> → ${esc(v)}</span><button type="button" class="ib" data-delrule="${esc(k)}" aria-label="규칙 삭제">✕</button></div>`).join(''):'<p class="note">아직 직접 정한 규칙이 없어요. 거래를 눌러 카테고리를 바꾸면 여기에 쌓여요.</p>';
+  const rv=$('#ruleCat').value;$('#ruleCat').innerHTML=`<optgroup label="지출">${catOptions('out',rv)}</optgroup><optgroup label="수입">${catOptions('in',rv)}</optgroup>`;
+}
+$('#catAdd').onsubmit=e=>{
+  e.preventDefault();const k=$('#catName').value.trim(),d=$('#catType').value;
+  if(!k)return;if(allCats().some(c=>c.k===k)){toast('이미 있는 카테고리예요');return}
+  settings.customCats=(settings.customCats||[]).concat({k,d,c:PALETTE[(settings.customCats||[]).length%PALETTE.length],w:[],custom:true});
+  EXTRA=settings.customCats;persist();$('#catName').value='';refreshCatOptions();renderCatAdmin();toast(`'${k}' 카테고리를 만들었어요`);
+};
+$('#ruleAdd').onsubmit=e=>{
+  e.preventDefault();const k=$('#ruleKw').value.trim(),cat=$('#ruleCat').value;if(!k||!cat)return;
+  settings.rules[k]=cat;const d=catOf(cat).d;
+  const n=applyCat(t=>t.dir===d&&!t.mc&&(t.m||'').toUpperCase().includes(k.toUpperCase()),cat);
+  persist();$('#ruleKw').value='';renderCatAdmin();render();toast(n?`규칙 저장 · 기존 거래 ${n}건에도 적용했어요`:'규칙을 저장했어요');
+};
+document.addEventListener('click',e=>{
+  const dc=e.target.closest('[data-delcat]');
+  if(dc){const k=dc.dataset.delcat;if(catDelArmed!==k){catDelArmed=k;renderCatAdmin();return}
+    catDelArmed=null;const c=catOf(k);const fb=c.d==='in'?'기타수입':'기타';
+    settings.customCats=(settings.customCats||[]).filter(x=>x.k!==k);EXTRA=settings.customCats;
+    for(const [kw,v] of Object.entries(settings.rules))if(v===k)delete settings.rules[kw];
+    applyCat(t=>t.cat===k,fb);persist();refreshCatOptions();renderCatAdmin();render();toast(`'${k}'을(를) 지우고 거래는 ${fb}(으)로 옮겼어요`);return}
+  const dr=e.target.closest('[data-delrule]');
+  if(dr){delete settings.rules[dr.dataset.delrule];persist();renderCatAdmin();toast('규칙을 지웠어요')}
+});
+$('#recatBtn').onclick=()=>{
+  let n=0;for(const t of allTx()){if(t.mc||/^(내 계좌|페이 충전)/.test(t.cat))continue;const c=guessCat(t.m,t.dir,t.raw||'',settings.rules);if(c!==t.cat){t.cat=c;t.ex=!!catOf(c).ex;n++}}
+  if(n)persist();render();toast(n?`${n}건을 다시 분류했어요`:'바뀐 거래가 없어요');
+};
+
 /* ---------- 설정 ---------- */
 $('#nameSave').onclick=()=>{settings.myName=$('#nameIn').value.trim();persist();toast(settings.myName?'저장했어요':'지웠어요')};
 $('#budgetSave').onclick=()=>{settings.budget=Math.max(0,+$('#budgetIn').value||0);persist('settings');render();toast(settings.budget?'예산을 저장했어요':'예산을 지웠어요')};
@@ -771,7 +844,9 @@ $('#restoreBtn').onclick=()=>{
   const have=new Set(allTx().map(t=>t.id));let n=0;const add=[];
   for(const ts of Object.values(d.months))for(const t of ts||[]){if(t&&t.id&&!have.has(t.id)&&t.d&&t.amt){add.push(t);n++}}
   if(add.length)addTxs(add);
-  if(d.settings&&d.settings.rules){settings.rules={...d.settings.rules,...settings.rules};persist('settings')}
+  if(d.settings&&d.settings.rules){settings.rules={...d.settings.rules,...settings.rules}}
+  if(d.settings&&Array.isArray(d.settings.customCats)){for(const c of d.settings.customCats)if(c&&c.k&&!allCats().some(x=>x.k===c.k))settings.customCats=(settings.customCats||[]).concat(c);EXTRA=settings.customCats;refreshCatOptions()}
+  persist();
   $('#backupRes').textContent=`${n}건을 복원했어요. 이미 있던 거래는 그대로 두었습니다.`;render();
 };
 
