@@ -177,8 +177,8 @@ details summary{font-weight:800;cursor:pointer;min-height:32px}
     </div>
     <div class="card">
       <h3>통장 내역으로 대사하기</h3>
-      <p>케이뱅크·국민은행 앱에서 거래내역을 엑셀(xlsx, xls, csv)로 받아 올리세요. 이미 기록된 거래와 맞춰 보고, 알림에서 빠진 거래만 새로 추가합니다.</p>
-      <label class="btn file">거래내역 파일 고르기<input type="file" id="bankFile" accept=".csv,.xlsx,.xls,text/csv"></label>
+      <p>케이뱅크·국민은행 거래내역을 엑셀(xlsx, xls, csv)이나 PDF로 받아 올리세요. 이미 기록된 거래와 맞춰 보고, 알림에서 빠진 거래만 새로 추가합니다.</p>
+      <label class="btn file">거래내역 파일 고르기<input type="file" id="bankFile" accept=".csv,.xlsx,.xls,.pdf,text/csv,application/pdf"></label>
       <div class="result" id="bankRes"></div>
     </div>
   </section>
@@ -186,6 +186,11 @@ details summary{font-weight:800;cursor:pointer;min-height:32px}
   <!-- 연동 -->
   <section class="view" id="v-set">
     <h2>연동과 설정</h2>
+    <div class="card">
+      <h3>내 이름</h3>
+      <p>통장 내역에서 보낸분·받는분이 내 이름인 거래(케이뱅크↔국민은행 이체 등)는 지출에서 빼요.</p>
+      <div class="tools"><input id="nameIn" autocomplete="off" placeholder="통장에 찍히는 이름"><button class="btn pri" id="nameSave">저장</button></div>
+    </div>
     <div class="card">
       <h3>월 예산</h3>
       <p>비워 두면 예산 막대가 보이지 않습니다.</p>
@@ -269,16 +274,19 @@ const CATS=[
  {k:'편의점·마트',c:'#e0a100',d:'out',w:['GS25','지에스25','CU','씨유','세븐일레븐','이마트24','미니스톱','이마트','홈플러스','롯데마트','코스트코','노브랜드','마트','슈퍼','컬리']},
  {k:'교통',c:'#2a6fdb',d:'out',w:['택시','카카오T','카카오모빌리티','티머니','코레일','KTX','지하철','버스','교통','SRT','주유','오일','에너지','하이패스','주차','쏘카','타다','항공']},
  {k:'쇼핑',c:'#8a3ffc',d:'out',w:['쿠팡','네이버페이','무신사','올리브영','지그재그','에이블리','29CM','11번가','G마켓','옥션','SSG','신세계','롯데백화점','현대백화점','다이소','아트박스','유니클로','자라','H&M','알리','테무']},
- {k:'주거·통신',c:'#0d7680',d:'out',w:['SKT','에스케이텔레콤','KT','LG유플러스','LGU+','관리비','월세','전기','가스','수도','인터넷','넷플릭스','유튜브','디즈니','왓챠','티빙','쿠팡플레이','애플','APPLE','구글','멜론','스포티파이']},
+ {k:'주거·통신',c:'#0d7680',d:'out',w:['SKT','에스케이텔레콤','KT','LG유플러스','LGU+','관리비','월세','전기','가스','수도','인터넷','넷플릭스','유튜브','디즈니','왓챠','티빙','쿠팡플레이','애플','APPLE','구글','멜론','스포티파이','Spotify','SPOTIFY']},
  {k:'의료·건강',c:'#d6336c',d:'out',w:['병원','의원','약국','치과','한의원','안과','피부과','정형외과','헬스','필라테스','요가']},
  {k:'문화·여가',c:'#5c940d',d:'out',w:['CGV','롯데시네마','메가박스','영화','서점','교보','yes24','예스24','알라딘','노래','PC방','볼링','전시','티켓','인터파크','여행','호텔','숙박','야놀자','여기어때']},
  {k:'송금',c:'#495057',d:'out',w:['송금','이체','보냈']},
  {k:'카드대금',c:'#868e96',d:'out',w:['카드대금','신한카드','결제대금'],ex:true},
+ {k:'페이 충전',c:'#ced4da',d:'out',w:[],ex:true},
+ {k:'내 계좌 이체',c:'#dee2e6',d:'out',w:[],ex:true},
  {k:'기타',c:'#adb5bd',d:'out',w:[]},
  {k:'급여',c:'#0d7a5f',d:'in',w:['급여','월급','상여','DS단석']},
  {k:'용돈·받은돈',c:'#2b8a3e',d:'in',w:['받았','입금','보냈']},
  {k:'환불',c:'#40c057',d:'in',w:['취소','환불']},
  {k:'이자',c:'#12b886',d:'in',w:['이자','결산']},
+ {k:'내 계좌 입금',c:'#e9ecef',d:'in',w:[],ex:true},
  {k:'기타수입',c:'#69db7c',d:'in',w:[]}
 ];
 const catOf=k=>CATS.find(c=>c.k===k)||CATS.find(c=>c.k==='기타');
@@ -462,6 +470,7 @@ function render(){
   $('#recent').innerHTML=list.length?dayGroups(list.slice(0,12)):'';
   renderList();notices();
   if(document.activeElement!==$('#budgetIn'))$('#budgetIn').value=settings.budget||'';
+  if(document.activeElement!==$('#nameIn'))$('#nameIn').value=settings.myName||'';
 }
 function renderList(){
   const q=$('#q').value.trim().toLowerCase(),fc=$('#fCat').value;
@@ -554,7 +563,8 @@ function drawPreview(){
 }
 function importParsed(list){
   const add=[];let skipped=0;
-  for(const p of list){if(existsHash(p.h)||add.some(a=>a.h===p.h)){skipped++;continue}const dup=nearDup(p)||add.find(o=>o.amt===p.amt&&o.dir===p.dir&&o.src!==p.src&&Math.abs(new Date(o.d)-new Date(p.d))<=180000);if(dup){skipped++;continue}add.push({id:uid(),...p})}
+  const me=(settings.myName||'').replace(/\s/g,'');
+  for(const p of list){if(me&&(p.m||'').replace(/\s/g,'').includes(me)){p.cat=p.dir==='in'?'내 계좌 입금':'내 계좌 이체';p.ex=true}if(existsHash(p.h)||add.some(a=>a.h===p.h)){skipped++;continue}const dup=nearDup(p)||add.find(o=>o.amt===p.amt&&o.dir===p.dir&&o.src!==p.src&&Math.abs(new Date(o.d)-new Date(p.d))<=180000);if(dup){skipped++;continue}add.push({id:uid(),...p})}
   if(add.length)addTxs(add);
   return {added:add.length,skipped,list:add};
 }
@@ -600,16 +610,127 @@ function bankRows(rows,XL){
   }
   return out;
 }
+
+/* KB 등 PDF 거래내역서: 글자 위치로 표를 복원 */
+let pdfP=null;
+async function loadPDF(){
+  if(window.pdfjsLib)return window.pdfjsLib;
+  if(!pdfP)pdfP=(async()=>{
+    const base='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+    await new Promise((res,rej)=>{const sc=document.createElement('script');sc.src=base+'pdf.min.js';sc.onload=res;sc.onerror=rej;document.head.appendChild(sc)});
+    try{const code=await (await fetch(base+'pdf.worker.min.js')).text();window.pdfjsLib.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob([code],{type:'text/javascript'}))}
+    catch(_){window.pdfjsLib.GlobalWorkerOptions.workerSrc=base+'pdf.worker.min.js'}
+    return window.pdfjsLib;
+  })().catch(e=>{pdfP=null;throw e});
+  return pdfP;
+}
+async function pdfPages(buf,password){
+  const lib=await loadPDF();
+  const doc=await lib.getDocument({data:buf,password:password||undefined}).promise;
+  const pages=[];
+  for(let n=1;n<=doc.numPages;n++){const pg=await doc.getPage(n);const tc=await pg.getTextContent();pages.push(tc.items.filter(i=>i.str&&i.str.trim()).map(i=>({s:i.str.trim(),x:i.transform[4],y:i.transform[5],w:i.width||0})))}
+  return pages;
+}
+function pdfToBankItems(pages){
+  const out=[];let cols=null;
+  const DT=/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})\s*(?:(\d{1,2}):(\d{2})(?::(\d{2}))?)?/;
+  for(const items of pages){
+    const lines=[];
+    for(const it of items.slice().sort((a,b)=>b.y-a.y||a.x-b.x)){const L=lines.find(l=>Math.abs(l.y-it.y)<=3);if(L)L.items.push(it);else lines.push({y:it.y,items:[it]})}
+    lines.forEach(l=>{l.items.sort((a,b)=>a.x-b.x);const m=[];for(const it of l.items){const p=m[m.length-1];if(p&&it.x-(p.x+p.w)<=2.5&&it.x>=p.x){p.s+=it.s;p.w=it.x+it.w-p.x}else m.push({...it})}l.items=m});
+    let start=0;
+    for(let li=0;li<lines.length;li++){
+      const t=lines[li].items.map(i=>i.s.replace(/\s/g,''));
+      if(t.some(x=>/거래일|일시|일자/.test(x))&&t.some(x=>/출금|찾으신|지급/.test(x)&&!/가능/.test(x))&&t.some(x=>/입금|맡기신/.test(x))){
+        cols=lines[li].items.map((it,k)=>{const n=t[k];return {x:it.x+it.w/2,k:/거래일|일시|일자/.test(n)?'d':/잔액/.test(n)?'b':/출금|찾으신|지급/.test(n)?'o':/입금|맡기신/.test(n)?'i':/적요|내용|보낸|받는|기재|상대|거래처|메모/.test(n)?'t':'x',n}});
+        start=li+1;break;
+      }
+    }
+    if(!cols)continue;
+    const near=it=>{const cx=it.x+it.w/2;let best=null,bd=1e9;for(const c of cols){const d=Math.abs(c.x-cx);if(d<bd){bd=d;best=c}}return best};
+    let rec=null;
+    const flush=()=>{
+      if(!rec)return;
+      const dtxt=rec.filter(i=>near(i).k==='d').map(i=>i.s).join(' ');
+      const m=dtxt.match(DT)||rec.map(i=>i.s).join(' ').match(DT);
+      if(m){
+        const d=new Date(+m[1],+m[2]-1,+m[3],m[4]?+m[4]:12,m[5]?+m[5]:0);
+        let o=0,inn=0;const txt=[];
+        for(const it of rec){const c=near(it);const num=/^-?[\d,]+(원)?$/.test(it.s)?+it.s.replace(/[,원]/g,''):null;
+          if(c.k==='o'&&num!=null)o=num;else if(c.k==='i'&&num!=null)inn=num;else if(c.k==='t'&&it.s!=='-'&&num==null)txt.push({s:it.s,p:/보낸|받는|상대|거래처|기재|내용/.test(c.n)?0:/적요/.test(c.n)?1:2})}
+        const mm=txt.sort((a,b)=>a.p-b.p).map(t=>t.s).join(' ').replace(/\s+/g,' ').trim().slice(0,40);
+        if(o>0)out.push({amt:o,dir:'out',d,m:mm});
+        if(inn>0)out.push({amt:inn,dir:'in',d,m:mm});
+      }
+      rec=null;
+    };
+    for(const l of lines.slice(start)){
+      const dItem=l.items.find(i=>near(i).k==='d'&&/\d{4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}/.test(i.s));
+      if(dItem){flush();rec=l.items.slice()}
+      else if(rec)rec.push(...l.items);
+    }
+    flush();
+  }
+  return cols?out:null;
+}
 $('#bankFile').addEventListener('change',async e=>{
   const f=e.target.files[0];if(!f)return;e.target.value='';const res=$('#bankRes');res.textContent='읽는 중…';
-  let rows,XL=null;
+  let items=null,isPdf=/\.pdf$/i.test(f.name)||f.type==='application/pdf';
+  if(isPdf){bankPdfFile=f;await importBankPdf();return}
+  if(/\.csv$/i.test(f.name)){
+    let t=await f.text();if(/\uFFFD/.test(t)){try{t=new TextDecoder('euc-kr').decode(await f.arrayBuffer())}catch(_){}}
+    items=bankRows(parseCSV(t),null);
+    if(!items){res.textContent='거래일·출금 열을 찾지 못했어요. 은행에서 받은 원본 파일인지 확인해 주세요.';return}
+    reconcile(items,bankSrc(f.name));return;
+  }
+  bankXlFile=f;await importBankExcel();
+});
+let bankXlFile=null,ocP=null;
+function loadOfficeCrypto(){if(window.officeCrypto)return Promise.resolve(window.officeCrypto);if(!ocP)ocP=new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='officecrypto.js';sc.onload=()=>res(window.officeCrypto);sc.onerror=()=>{ocP=null;rej(new Error('load'))};document.head.appendChild(sc)});return ocP}
+function askPassword(wrong,retry){
+  const res=$('#bankRes');
+  res.innerHTML=`<p style="margin:0 0 8px">${wrong?'비밀번호가 맞지 않아요. 다시 입력해 주세요.':'비밀번호가 걸린 파일이에요. 은행이 안내한 비밀번호(보통 생년월일 등)를 입력해 주세요. 비밀번호는 이 기기에서 파일을 여는 데만 쓰고 저장하지 않아요.'}</p><form class="tools" id="pwForm"><input id="filePw" type="password" autocomplete="off" placeholder="파일 비밀번호"><button class="btn pri">열기</button></form>`;
+  $('#pwForm').onsubmit=e=>{e.preventDefault();retry($('#filePw').value)};setTimeout(()=>{const el=$('#filePw');if(el)el.focus()},50);
+}
+async function importBankExcel(password){
+  const res=$('#bankRes');res.textContent='엑셀 읽는 중…';
+  let buf=new Uint8Array(await bankXlFile.arrayBuffer());
+  const isOle=buf[0]===0xD0&&buf[1]===0xCF&&buf[2]===0x11&&buf[3]===0xE0;
   try{
-    if(/\.csv$/i.test(f.name)){let t=await f.text();if(/\uFFFD/.test(t)){try{t=new TextDecoder('euc-kr').decode(await f.arrayBuffer())}catch(_){}}rows=parseCSV(t)}
-    else{XL=await loadXLSX();const wb=XL.read(await f.arrayBuffer(),{type:'array'});rows=XL.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:''})}
-  }catch(err){res.textContent='파일을 열지 못했어요. 엑셀이 안 되면 CSV로 저장해서 다시 올려 주세요.';return}
-  const src=/국민|kb/i.test(f.name)?'국민은행':/케이|kbank/i.test(f.name)?'케이뱅크':'통장';
+    if(isOle){
+      const oc=await loadOfficeCrypto();
+      if(await oc.isEncrypted(buf)){
+        if(password===undefined){askPassword(false,importBankExcel);return}
+        res.textContent='암호 푸는 중… (몇 초 걸릴 수 있어요)';
+        try{buf=await oc.decrypt(buf,password)}catch(err){askPassword(true,importBankExcel);return}
+      }
+    }
+  }catch(err){res.textContent=navigator.onLine===false?'인터넷 연결을 확인해 주세요.':'암호 해제 도구를 불러오지 못했어요. GitHub에 officecrypto.js 파일이 올라가 있는지 확인해 주세요.';return}
+  let rows,XL;
+  try{XL=await loadXLSX();const wb=XL.read(buf,{type:'array'});rows=XL.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:''})}
+  catch(err){res.textContent=/password|encrypt/i.test(String(err&&err.message))?'비밀번호가 맞지 않거나 지원하지 않는 암호 방식이에요.':'파일을 열지 못했어요. PDF로 받아서 올려도 돼요.';return}
   const items=bankRows(rows,XL);
   if(!items){res.textContent='거래일·출금 열을 찾지 못했어요. 은행에서 받은 원본 파일인지 확인해 주세요.';return}
+  reconcile(items,bankSrc(bankXlFile.name));
+}
+let bankPdfFile=null;
+function bankSrc(name){return /국민|kb/i.test(name)?'국민은행':/케이|kbank/i.test(name)?'케이뱅크':'통장'}
+async function importBankPdf(password){
+  const res=$('#bankRes');res.textContent='PDF 읽는 중…';
+  let pages;
+  try{pages=await pdfPages(await bankPdfFile.arrayBuffer(),password)}
+  catch(err){
+    if(err&&err.name==='PasswordException'){
+      askPassword(!!password,importBankPdf);return;
+    }
+    res.textContent=navigator.onLine===false?'PDF를 처음 읽을 때는 인터넷 연결이 필요해요.':'PDF를 열지 못했어요. 은행 앱에서 받은 원본 파일인지 확인해 주세요.';return;
+  }
+  const items=pdfToBankItems(pages);
+  if(!items){res.textContent='표의 머리글(거래일시·출금액·입금액)을 찾지 못했어요. 스캔한 이미지 PDF는 읽을 수 없어요.';return}
+  reconcile(items,bankSrc(bankPdfFile.name)==='통장'?'국민은행':bankSrc(bankPdfFile.name));
+}
+function reconcile(items,src){
+  const res=$('#bankRes');
   const existing=allTx();const used=new Set();let matched=0;const add=[];
   for(const it of items){
     const ts=it.d.getTime();
@@ -617,15 +738,19 @@ $('#bankFile').addEventListener('change',async e=>{
     if(hit){used.add(hit.id);matched++;continue}
     const h=fnv('bank|'+src+'|'+toLocalISO(it.d)+'|'+it.amt+'|'+it.dir+'|'+it.m);
     if(existsHash(h)){matched++;continue}
-    const cat=guessCat(it.m,it.dir,it.m,settings.rules);
+    let cat=guessCat(it.m,it.dir,it.m,settings.rules);
+    const me=(settings.myName||'').replace(/\s/g,'');
+    if(me&&it.m.replace(/\s/g,'').includes(me))cat=it.dir==='in'?'내 계좌 입금':'내 계좌 이체';
+    else if(it.dir==='out'&&/카카오페이|네이버페이|토스|페이코/.test(it.m)&&!settings.rules[it.m])cat='페이 충전';
     add.push({id:uid(),amt:it.amt,dir:it.dir,d:toLocalISO(it.d),m:it.m,cat,src,card:'',ex:!!catOf(cat).ex,memo:'통장 대사로 추가',h});
   }
   if(add.length)addTxs(add);
-  res.innerHTML=`거래 ${items.length}건 확인 · <b>${matched}건 일치</b> · <b style="color:var(--acc2)">${add.length}건 새로 추가</b> (알림에서 빠졌던 거래)${add.some(a=>a.cat==='카드대금')?'<br><span class="note">신한카드 대금 출금은 개별 결제와 겹치지 않도록 통계에서 제외해 두었어요.</span>':''}${add.length?'<br><span class="note">내 계좌끼리 옮긴 돈이 있으면 해당 거래를 눌러 "통계에서 제외"를 켜 주세요.</span>':''}`;
+  res.innerHTML=`거래 ${items.length}건 확인 · <b>${matched}건 일치</b> · <b style="color:var(--acc2)">${add.length}건 새로 추가</b> (알림에서 빠졌던 거래)${add.some(a=>a.cat==='카드대금')?'<br><span class="note">신한카드 대금 출금은 개별 결제와 겹치지 않도록 통계에서 제외해 두었어요.</span>':''}${add.some(a=>a.cat==='페이 충전')?'<br><span class="note">카카오페이 등 페이 충전은 송금·결제 알림과 겹치지 않도록 통계에서 제외했어요.</span>':''}${add.some(a=>a.cat==='내 계좌 이체')?'<br><span class="note">본인 이름이 보낸분/받는분인 거래는 내 계좌 간 이체로 보고 제외했어요.</span>':(settings.myName?'':'<br><span class="note">연동 탭에서 내 이름을 넣어 두면 내 계좌끼리 옮긴 돈을 자동으로 제외해요.</span>')}`;
   render();
-});
+}
 
 /* ---------- 설정 ---------- */
+$('#nameSave').onclick=()=>{settings.myName=$('#nameIn').value.trim();persist();toast(settings.myName?'저장했어요':'지웠어요')};
 $('#budgetSave').onclick=()=>{settings.budget=Math.max(0,+$('#budgetIn').value||0);persist('settings');render();toast(settings.budget?'예산을 저장했어요':'예산을 지웠어요')};
 function markBackup(){settings.lastBackup=new Date().toISOString();persist();notices()}
 $('#backupFile').onclick=async()=>{
