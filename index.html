@@ -123,6 +123,8 @@ details summary{font-weight:800;cursor:pointer;min-height:32px}
 .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 10px;font-size:14px;min-height:34px}
 .chip i{width:10px;height:10px;border-radius:50%;flex:none}
 .chip button{border:0;background:none;color:var(--mute);min-width:30px;min-height:30px;font-size:13px;font-weight:700}
+.listhead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:4px 0}
+.btn.sm{min-height:40px;padding:0 12px;font-size:14px}
 .rule{display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid var(--line);font-size:15px}
 .tools select{min-width:0}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
@@ -503,8 +505,19 @@ function renderList(){
   const q=$('#q').value.trim().toLowerCase(),fc=$('#fCat').value;
   const list=monthTx(cur).filter(t=>(!fc||t.cat===fc)&&(!q||(t.m+' '+(t.memo||'')+' '+t.src).toLowerCase().includes(q)));
   const sum=list.filter(t=>!t.ex).reduce((s,t)=>s+(t.dir==='out'?t.amt:-t.amt),0);
-  $('#list').innerHTML=list.length?`<p class="note">${list.length}건 · 순지출 <b class="num">${won(sum)}</b></p>`+dayGroups(list):'<div class="empty">조건에 맞는 내역이 없어요.</div>';
+  shownIds=list.map(t=>t.id);
+  $('#list').innerHTML=list.length?`<div class="listhead"><p class="note">${list.length}건 · 순지출 <b class="num">${won(sum)}</b></p><button class="btn danger sm" id="bulkDel">${bulkArmed?`정말 ${list.length}건 삭제`:`보이는 ${list.length}건 삭제`}</button></div>`+dayGroups(list):'<div class="empty">조건에 맞는 내역이 없어요.</div>';
 }
+let shownIds=[],bulkArmed=false;
+$('#q').addEventListener('input',()=>{bulkArmed=false});$('#fCat').addEventListener('change',()=>{bulkArmed=false});
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#bulkDel'))return;
+  if(!bulkArmed){bulkArmed=true;renderList();return}
+  bulkArmed=false;const ids=new Set(shownIds);const removed={};
+  for(const k of Object.keys(months)){const keep=[];for(const t of months[k]){if(ids.has(t.id))(removed[k]=removed[k]||[]).push(t);else keep.push(t)}months[k]=keep}
+  const n=Object.values(removed).flat().length;persist();render();
+  toast(`${n}건을 삭제했어요`,()=>{for(const [k,ts] of Object.entries(removed))(months[k]=months[k]||[]).push(...ts);persist();render()});
+});
 const svg=$('#chartSvg');let chartData=[[],0];
 function drawChart(daily,today){chartData=[daily,today];paint()}
 function paint(){
@@ -523,7 +536,7 @@ document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('clic
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+b.dataset.v));
   window.scrollTo(0,0);if(b.dataset.v==='home')paint();
 }));
-function shiftMonth(d){let [y,m]=cur.split('-').map(Number);m+=d;if(m<1){m=12;y--}if(m>12){m=1;y++}cur=y+'-'+pad(m);render()}
+function shiftMonth(d){bulkArmed=false;let [y,m]=cur.split('-').map(Number);m+=d;if(m<1){m=12;y--}if(m>12){m=1;y++}cur=y+'-'+pad(m);render()}
 $('#prevM').onclick=()=>shiftMonth(-1);$('#nextM').onclick=()=>shiftMonth(1);
 function refreshCatOptions(){const v=$('#fCat').value;$('#fCat').innerHTML='<option value="">전체 카테고리</option>'+allCats().map(c=>`<option>${esc(c.k)}</option>`).join('');$('#fCat').value=v}
 refreshCatOptions();
@@ -748,7 +761,7 @@ async function importBankExcel(password){
   reconcile(items,bankSrc(bankXlFile.name));
 }
 let bankPdfFile=null;
-function bankSrc(name){return /국민|kb/i.test(name)?'국민은행':/케이|kbank/i.test(name)?'케이뱅크':'통장'}
+function bankSrc(name){return /케이뱅크|케이|kbank/i.test(name)?'케이뱅크':/국민|kb|스타뱅킹/i.test(name)?'국민은행':'통장'}
 async function importBankPdf(password){
   const res=$('#bankRes');res.textContent='PDF 읽는 중…';
   let pages;
@@ -765,11 +778,11 @@ async function importBankPdf(password){
 }
 function reconcile(items,src){
   const res=$('#bankRes');
-  const existing=allTx();const used=new Set();let matched=0;const add=[];
+  const existing=allTx();const used=new Set();let matched=0,filled=0;const add=[];
   for(const it of items){
     const ts=it.d.getTime();
     const hit=existing.find(t=>!used.has(t.id)&&t.amt===it.amt&&t.dir===it.dir&&Math.abs(new Date(t.d).getTime()-ts)<=36*3600000);
-    if(hit){used.add(hit.id);matched++;continue}
+    if(hit){used.add(hit.id);matched++;if(!hit.m&&it.m){hit.m=it.m;if(!hit.mc){const c=guessCat(it.m,hit.dir,it.m,settings.rules);hit.cat=c;hit.ex=!!catOf(c).ex}filled++}continue}
     const h=fnv('bank|'+src+'|'+toLocalISO(it.d)+'|'+it.amt+'|'+it.dir+'|'+it.m);
     if(existsHash(h)){matched++;continue}
     let cat=guessCat(it.m,it.dir,it.m,settings.rules);
@@ -778,8 +791,8 @@ function reconcile(items,src){
     else if(it.dir==='out'&&/카카오페이|네이버페이|토스|페이코/.test(it.m)&&!settings.rules[it.m])cat='페이 충전';
     add.push({id:uid(),amt:it.amt,dir:it.dir,d:toLocalISO(it.d),m:it.m,cat,src,card:'',ex:!!catOf(cat).ex,memo:'통장 대사로 추가',h});
   }
-  if(add.length)addTxs(add);
-  res.innerHTML=`거래 ${items.length}건 확인 · <b>${matched}건 일치</b> · <b style="color:var(--acc2)">${add.length}건 새로 추가</b> (알림에서 빠졌던 거래)${add.some(a=>a.cat==='카드대금')?'<br><span class="note">신한카드 대금 출금은 개별 결제와 겹치지 않도록 통계에서 제외해 두었어요.</span>':''}${add.some(a=>a.cat==='페이 충전')?'<br><span class="note">카카오페이 등 페이 충전은 송금·결제 알림과 겹치지 않도록 통계에서 제외했어요.</span>':''}${add.some(a=>a.cat==='내 계좌 이체')?'<br><span class="note">본인 이름이 보낸분/받는분인 거래는 내 계좌 간 이체로 보고 제외했어요.</span>':(settings.myName?'':'<br><span class="note">연동 탭에서 내 이름을 넣어 두면 내 계좌끼리 옮긴 돈을 자동으로 제외해요.</span>')}`;
+  if(add.length)addTxs(add);else if(filled)persist();
+  res.innerHTML=`거래 ${items.length}건 확인 · <b>${matched}건 일치</b>${filled?` (그중 ${filled}건은 비어 있던 가맹점을 채움)`:''} · <b style="color:var(--acc2)">${add.length}건 새로 추가</b> (알림에서 빠졌던 거래)${add.some(a=>a.cat==='카드대금')?'<br><span class="note">신한카드 대금 출금은 개별 결제와 겹치지 않도록 통계에서 제외해 두었어요.</span>':''}${add.some(a=>a.cat==='페이 충전')?'<br><span class="note">카카오페이 등 페이 충전은 송금·결제 알림과 겹치지 않도록 통계에서 제외했어요.</span>':''}${add.some(a=>a.cat==='내 계좌 이체')?'<br><span class="note">본인 이름이 보낸분/받는분인 거래는 내 계좌 간 이체로 보고 제외했어요.</span>':(settings.myName?'':'<br><span class="note">연동 탭에서 내 이름을 넣어 두면 내 계좌끼리 옮긴 돈을 자동으로 제외해요.</span>')}`;
   render();
 }
 
